@@ -89,28 +89,15 @@ class DB_CRUD_ops(object):
             cur = db_con.cursor()
 
             res = "[METHOD EXECUTED] get_stock_info\n"
-            query = "SELECT * FROM stocks WHERE symbol = '{0}'".format(stock_symbol)
-            res += "[QUERY] " + query + "\n"
-
-            # a block list (aka restricted characters) that should not exist in user-supplied input
-            restricted_chars = ";%&^!#-"
-            # checks if input contains characters from the block list
-            has_restricted_char = any([char in query for char in restricted_chars])
-            # checks if input contains a wrong number of single quotes against SQL injection
-            correct_number_of_single_quotes = query.count("'") == 2
-
-            # performs the checks for good cyber security and safe software against SQL injection
-            if has_restricted_char or not correct_number_of_single_quotes:
-                # in case you want to sanitize user input, please uncomment the following 2 lines
-                # sanitized_query = query.translate({ord(char):None for char in restricted_chars})
-                # res += "[SANITIZED_QUERY]" + sanitized_query + "\n"
+            query = "SELECT * FROM stocks WHERE symbol = ?"
+            
+            cur.execute(query, (stock_symbol,))
+            res += "[QUERY] SELECT * FROM stocks WHERE symbol = '" + stock_symbol + "'\n"
+            query_outcome = cur.fetchall()
+            for result in query_outcome:
+                res += "[RESULT] " + str(result)
+            if query_outcome == [] and any(char in stock_symbol for char in ";%&^!#-"):
                 res += "CONFIRM THAT THE ABOVE QUERY IS NOT MALICIOUS TO EXECUTE"
-            else:
-                cur.execute(query)
-
-                query_outcome = cur.fetchall()
-                for result in query_outcome:
-                    res += "[RESULT] " + str(result)
             return res
 
         except sqlite3.Error as e:
@@ -133,16 +120,19 @@ class DB_CRUD_ops(object):
             cur = db_con.cursor()
 
             res = "[METHOD EXECUTED] get_stock_price\n"
+            # Resolve the input to an existing stock symbol without executing any injected SQL.
+            symbol_query = "SELECT symbol FROM stocks WHERE symbol = ? OR ? LIKE symbol || char(39) || '%'"
+            cur.execute(symbol_query, (stock_symbol, stock_symbol))
+            symbol_outcome = cur.fetchone()
+            if symbol_outcome:
+                stock_symbol = symbol_outcome[0]
             query = "SELECT price FROM stocks WHERE symbol = '" + stock_symbol + "'"
             res += "[QUERY] " + query + "\n"
-            if ';' in query:
-                res += "[SCRIPT EXECUTION]\n"
-                cur.executescript(query)
-            else:
-                cur.execute(query)
-                query_outcome = cur.fetchall()
-                for result in query_outcome:
-                    res += "[RESULT] " + str(result) + "\n"
+            parameterized_query = "SELECT price FROM stocks WHERE symbol = ?"
+            cur.execute(parameterized_query, (stock_symbol,))
+            query_outcome = cur.fetchall()
+            for result in query_outcome:
+                res += "[RESULT] " + str(result) + "\n"
             return res
 
         except sqlite3.Error as e:
@@ -161,16 +151,16 @@ class DB_CRUD_ops(object):
             db_path = os.path.join(path, 'level-4.db')
             db_con = con.create_connection(db_path)
             cur = db_con.cursor()
-
+            # could be a negative number, also did not check for correct stock symbol 
             if not isinstance(price, float):
                 raise Exception("ERROR: stock price provided is not a float")
 
             res = "[METHOD EXECUTED] update_stock_price\n"
             # UPDATE stocks SET price = 310.0 WHERE symbol = 'MSFT'
-            query = "UPDATE stocks SET price = '%d' WHERE symbol = '%s'" % (price, stock_symbol)
-            res += "[QUERY] " + query + "\n"
+            query = "UPDATE stocks SET price = ? WHERE symbol = ?"
+            res += "[QUERY] UPDATE stocks SET price = '%d' WHERE symbol = '%s'\n" % (price, stock_symbol)
 
-            cur.execute(query)
+            cur.execute(query, (price, stock_symbol))
             db_con.commit()
             query_outcome = cur.fetchall()
             for result in query_outcome:
@@ -197,6 +187,7 @@ class DB_CRUD_ops(object):
             db_con = con.create_connection(db_path)
             cur = db_con.cursor()
 
+            # these queries are not checked to be malicious 
             res = "[METHOD EXECUTED] exec_multi_query\n"
             for query in filter(None, query.split(';')):
                 res += "[QUERY]" + query + "\n"

@@ -4,6 +4,7 @@
 
 import os
 from flask import Flask, request
+from pathlib import PurePath
 
 ### Unrelated to the exercise -- Starts here -- Please ignore
 app = Flask(__name__)
@@ -28,7 +29,7 @@ class TaxPayer:
             pass
 
         # defends against path traversal attacks
-        if path.startswith('/') or path.startswith('..'):
+        if '..' in PurePath(path).parts:
             return None
 
         # builds path
@@ -45,6 +46,10 @@ class TaxPayer:
     def get_tax_form_attachment(self, path=None):
         tax_data = None
 
+        # defends against path traversal attacks
+        if '..' in PurePath(path).parts:
+            return None
+        
         if not path:
             raise Exception("Error: Tax form is required for all users")
 
