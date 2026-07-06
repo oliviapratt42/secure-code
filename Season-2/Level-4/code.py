@@ -36,7 +36,7 @@ planet_data = {
 def index():
     if request.method == 'POST':
         planet = request.form.get('planet')
-        sanitized_planet = re.sub(r'[<>{}[\]]', '', planet if planet else '')
+        sanitized_planet = request.form.get('planet', '').strip()
 
         if sanitized_planet:
             if 'script' in sanitized_planet.lower() :
